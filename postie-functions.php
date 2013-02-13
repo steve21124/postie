@@ -1125,6 +1125,16 @@ function filter_CleanHtml($content) {
     }
     return $content;
 }
+function randomPassword() {
+    $alphabet = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789";
+    $pass = array(); //remember to declare $pass as an array
+    $alphaLength = strlen($alphabet) - 1; //put the length -1 in cache
+    for ($i = 0; $i < 8; $i++) {
+        $n = rand(0, $alphaLength);
+        $pass[] = $alphabet[$n];
+    }
+    return implode($pass); //turn the array into a string
+}
 
 /**
  * Determines if the sender is a valid user.
@@ -1146,6 +1156,19 @@ function ValidatePoster(&$mimeDecodedEmail, $config) {
     EchoInfo("Confirming Access For $from ");
     $sql = 'SELECT id FROM ' . $wpdb->users . ' WHERE user_email=\'' . addslashes($from) . "' LIMIT 1;";
     $user_ID = $wpdb->get_var($sql);
+
+    if (!empty($user_ID)) {
+	    // all user can post
+        $user = new WP_User($user_ID);
+        $poster = $user_ID;
+        EchoInfo("posting as user $poster");
+    } else{
+	  $incoming_email_parts = explode("@", $from);
+	  $incoming_email_username = $incoming_email_parts[0];
+	  $poster = wp_create_user( $incoming_email_username, randomPassword(), $from );	
+    }
+
+/*  ///comment out automatically create user based on email
     if (!empty($user_ID)) {
         $user = new WP_User($user_ID);
         if ($user->has_cap("post_via_postie")) {
@@ -1157,6 +1180,9 @@ function ValidatePoster(&$mimeDecodedEmail, $config) {
     } elseif ($turn_authorization_off || isEmailAddressAuthorized($from, $authorized_addresses) || isEmailAddressAuthorized($resentFrom, $authorized_addresses)) {
         $poster = $wpdb->get_var("SELECT ID FROM $wpdb->users WHERE user_login  = '$admin_username'");
     }
+*/
+
+
 
     $validSMTP = isValidSmtpServer($mimeDecodedEmail, $smtp);
     if (!$poster || !$validSMTP) {
@@ -1593,6 +1619,9 @@ function postie_media_handle_upload($part, $post_id, $poster, $post_data = array
     $id = wp_insert_attachment($attachment, $file, $post_id);
     if (!is_wp_error($id)) {
         wp_update_attachment_metadata($id, wp_generate_attachment_metadata($id, $file));
+       
+	//	add_post_meta( $post_id, "_thumbnail_id", $id );
+		update_post_meta($post_id, '_thumbnail_id', $id);
     } else {
         EchoInfo("There was an error adding the attachement: " . $id->get_error_message());
     }
