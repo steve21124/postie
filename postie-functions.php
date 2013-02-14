@@ -137,6 +137,20 @@ function CreatePost($poster, $mimeDecodedEmail, $post_id, &$is_reply, $config) {
     if ($fulldebug)
         DebugDump($mimeDecodedEmail);
 
+    $subject_temp = GetSubject($mimeDecodedEmail, $content, $config);   //this get $subject
+	//EchoInfo("subject is : " . $subject_temp);
+	//temporary update post_name so it can be use in getting the post_name for photos and use as filename
+	//Reason for use with Wordpress Readonly amazon S3 plugin which automatically upload the file to S3. 
+	// if not doing this update, it will use default photo.name and overwrite existing one
+    $temp_post = array(
+        'post_title' => $subject_temp,
+        'post_name' => sanitize_title($subject_temp),
+        'ID' => $post_id
+    );
+	// Update the post into the database
+	wp_update_post( $temp_post );
+	
+
     $content = GetContent($mimeDecodedEmail, $attachments, $post_id, $poster, $config);
     if ($fulldebug)
         DebugEcho("the content is $content");
@@ -1526,6 +1540,7 @@ function filter_AppleFile(&$mimeDecodedEmail) {
     }
 }
 
+// $post_id = id of the post which attachment/photo will be attached to
 function postie_media_handle_upload($part, $post_id, $poster, $post_data = array()) {
     $overrides = array('test_form' => false);
 
@@ -1549,6 +1564,19 @@ function postie_media_handle_upload($part, $post_id, $poster, $post_data = array
             $name = $part->ctype_parameters['name'];
         }
     }
+	//EchoInfo display it to error_log
+   
+    $post = get_post($post_id);
+//	var_dump($post);
+//	$subject_temp = GetSubject($part);   //this get $subject
+	
+    //EchoInfo("---post name  : " . $post->post_name);
+
+    //for name try to use post title filename
+    //$name = "ini_baru_nama" . "-" . $name;
+    //make sure $post->post_name has been updated in postie-function.CreatePos because it create temporary post before updating the rest of parameters
+    $name = $post->post_name . "-" . $name;
+
     DebugEcho("name: $name, size: " . filesize($tmpFile));
 
     $the_file = array('name' => $name,
@@ -1568,7 +1596,8 @@ function postie_media_handle_upload($part, $post_id, $poster, $post_data = array
     }
 
     $time = current_time('mysql');
-    $post = get_post($post_id);
+    //get $post from the top
+    //$post = get_post($post_id);
     if (substr($post->post_date, 0, 4) > 0) {
         DebugEcho("using post date");
         $time = $post->post_date;
